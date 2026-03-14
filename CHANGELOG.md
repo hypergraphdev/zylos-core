@@ -5,7 +5,14 @@ All notable changes to zylos-core will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-03-15
+
+### Fixed
+- **activity-monitor crash after upgrade from 0.3.x**: when upgrading from a pre-v0.4.0 version, the old upgrade code restarted PM2 services before deploying the new ecosystem config, leaving `ZYLOS_PACKAGE_ROOT` unset. activity-monitor now falls back to `npm root -g` to locate the runtime package, preventing the crash
+
 ## [0.4.0] - 2026-03-15
+
+_(superseded by 0.4.1 — activity-monitor crash on upgrade from 0.3.x)_
 
 ### Added
 - **OpenAI Codex runtime support**: run Zylos on Codex CLI instead of Claude Code. Switch anytime with `zylos runtime codex` — memory, skills, and channels are fully preserved across the switch (#311)

@@ -93,6 +93,14 @@ const _runtimeIndexPath = (() => {
     path.dirname(new URL(import.meta.url).pathname), '../../../cli/lib/runtime/index.js'
   );
   if (fs.existsSync(devPath)) return devPath;
+  // Final fallback: discover via npm root -g.
+  // Handles the post-upgrade case where PM2 has a stale env (no ZYLOS_PACKAGE_ROOT)
+  // because the old upgrade code restarted services before deploying the new ecosystem config.
+  try {
+    const npmRoot = execSync('npm root -g', { encoding: 'utf8', stdio: 'pipe' }).trim();
+    const fallbackPath = path.join(npmRoot, 'zylos', 'cli', 'lib', 'runtime', 'index.js');
+    if (fs.existsSync(fallbackPath)) return fallbackPath;
+  } catch { /* ignore — throw below */ }
   throw new Error(
     '[activity-monitor] Cannot locate cli/lib/runtime/index.js. ' +
     'Ensure ZYLOS_PACKAGE_ROOT is set in the PM2 ecosystem config.'
