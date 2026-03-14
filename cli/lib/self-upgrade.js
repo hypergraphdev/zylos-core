@@ -1086,6 +1086,10 @@ function step10_startCoreServices(ctx) {
 
 /**
  * Step 11: verify services
+ *
+ * Polls up to 30 seconds (every 2 s) for all services to come online.
+ * Some services (e.g. component bots) take longer than 2 s to start after
+ * PM2 restarts them — a one-shot check caused spurious rollbacks.
  */
 function step11_verifyServices(ctx) {
   const startTime = Date.now();
@@ -1094,29 +1098,36 @@ function step11_verifyServices(ctx) {
     return { step: 11, name: 'verify_services', status: 'skipped', message: 'no services to verify', duration: Date.now() - startTime };
   }
 
-  // Brief wait for services to start
-  try { execSync('sleep 2', { stdio: 'pipe' }); } catch {}
+  const POLL_INTERVAL_MS = 2000;
+  const TIMEOUT_MS = 30000;
 
-  try {
-    const output = execSync('pm2 jlist 2>/dev/null', { encoding: 'utf8' });
-    const processes = JSON.parse(output);
+  while (Date.now() - startTime < TIMEOUT_MS) {
+    try { execSync('sleep 2', { stdio: 'pipe' }); } catch { /* ignore */ }
 
-    const notOnline = [];
-    for (const name of ctx.servicesWereRunning) {
-      const proc = processes.find(p => p.name === name);
-      if (!proc || proc.pm2_env?.status !== 'online') {
-        notOnline.push(name);
+    try {
+      const output = execSync('pm2 jlist 2>/dev/null', { encoding: 'utf8' });
+      const processes = JSON.parse(output);
+
+      const notOnline = ctx.servicesWereRunning.filter(name => {
+        const proc = processes.find(p => p.name === name);
+        return !proc || proc.pm2_env?.status !== 'online';
+      });
+
+      if (notOnline.length === 0) {
+        return { step: 11, name: 'verify_services', status: 'done', duration: Date.now() - startTime };
       }
-    }
 
-    if (notOnline.length > 0) {
-      return { step: 11, name: 'verify_services', status: 'failed', error: `Not online: ${notOnline.join(', ')}`, duration: Date.now() - startTime };
+      // If we still have time, keep polling
+      if (Date.now() - startTime + POLL_INTERVAL_MS >= TIMEOUT_MS) {
+        return { step: 11, name: 'verify_services', status: 'failed', error: `Not online after ${TIMEOUT_MS / 1000}s: ${notOnline.join(', ')}`, duration: Date.now() - startTime };
+      }
+    } catch (err) {
+      return { step: 11, name: 'verify_services', status: 'failed', error: err.message, duration: Date.now() - startTime };
     }
-
-    return { step: 11, name: 'verify_services', status: 'done', duration: Date.now() - startTime };
-  } catch (err) {
-    return { step: 11, name: 'verify_services', status: 'failed', error: err.message, duration: Date.now() - startTime };
   }
+
+  // Timed out
+  return { step: 11, name: 'verify_services', status: 'failed', error: `Timed out after ${TIMEOUT_MS / 1000}s`, duration: Date.now() - startTime };
 }
 
 // ---------------------------------------------------------------------------

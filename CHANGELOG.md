@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - **activity-monitor crash after upgrade from 0.3.x**: when upgrading from a pre-v0.4.0 version, the old upgrade code restarted PM2 services before deploying the new ecosystem config, leaving `ZYLOS_PACKAGE_ROOT` unset. activity-monitor now falls back to `npm root -g` to locate the runtime package, preventing the crash
+- **self-upgrade rollback on slow services**: step 11 (verify services) used a one-shot 2-second check, causing false rollbacks when component services (Lark, Telegram, BotsHub) took longer than 2 seconds to restart. Now polls every 2 seconds for up to 30 seconds
 
 ## [0.3.7] - 2026-03-11
 
